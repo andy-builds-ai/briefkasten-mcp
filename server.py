@@ -189,5 +189,18 @@ def zettel_liste(an: str | None = None) -> str:
     return "\n".join(lines)
 
 
+@mcp.tool()
+def zettel_lesen(dateiname: str) -> str:
+    """Return the full text of one Zettel from the mailbox.
+
+    Pass the exact filename as shown by zettel_liste, e.g.
+    "2026-07-11_1430_werkstatt-an-architekt.md". Rejects any filename that
+    tries to leave the mailbox folder, and reports clearly when the Zettel
+    does not exist.
+    """
+    path = _validate_dateiname(dateiname)
+    return _read_text(path)
+
+
 if __name__ == "__main__":
     mcp.run()
