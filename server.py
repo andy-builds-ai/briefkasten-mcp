@@ -21,15 +21,18 @@ load_dotenv(Path(__file__).parent / ".env")
 
 mcp = FastMCP("briefkasten")
 
-# Room names (von/an): lowercase letters and digits — nothing else,
-# because they become part of a filename. No hyphen, so the "-an-"
-# separator inside the filename stays unambiguous.
-NAME_PATTERN = re.compile(r"^[a-z0-9]+$")
+# Room names (von/an): 1–32 lowercase letters and digits — nothing else,
+# because they become part of a filename. No hyphen, so the "-an-" separator
+# inside the filename stays unambiguous. \Z (not $) anchors the true end of
+# string: $ also matches just before a trailing newline, so "werkstatt\n"
+# would otherwise slip through. The length cap keeps the built filename
+# inside the Windows path limit.
+NAME_PATTERN = re.compile(r"^[a-z0-9]{1,32}\Z")
 
 # Zettel filename: 2026-07-11_1430_werkstatt-an-architekt.md
 # (optional _2 suffix before .md when the same minute produces a collision)
 FILENAME_PATTERN = re.compile(
-    r"^(\d{4}-\d{2}-\d{2})_(\d{4})_([a-z0-9]+)-an-([a-z0-9]+)(?:_(\d+))?\.md$"
+    r"^(\d{4}-\d{2}-\d{2})_(\d{4})_([a-z0-9]+)-an-([a-z0-9]+)(?:_(\d+))?\.md\Z"
 )
 
 
@@ -69,28 +72,22 @@ def _validate_name(value: str, field: str) -> str:
 def _validate_dateiname(dateiname: str) -> Path:
     """Validate a Zettel filename and return its full path in the mailbox.
 
-    Rejects anything that could escape the mailbox folder: path separators,
-    '..', drive letters, absolute paths. The filename must be a plain
-    '<name>.md' directly inside the mailbox.
+    The name must match the Zettel scheme exactly (FILENAME_PATTERN). That
+    rejects path separators, '..', drive letters, control characters (incl.
+    embedded null bytes) and Windows device names (con, nul, …) in one step,
+    since none of them fit the scheme — only real Zettel names are readable.
     """
-    if (
-        not dateiname
-        or "/" in dateiname
-        or "\\" in dateiname
-        or ":" in dateiname
-        or ".." in dateiname
-        or not dateiname.endswith(".md")
-    ):
+    if not FILENAME_PATTERN.match(dateiname):
         raise BriefkastenError(
-            f"Ungültiger Dateiname: '{dateiname}' — erlaubt ist nur ein "
-            "einfacher Dateiname mit Endung .md, ohne Pfad-Anteile."
+            f"Ungültiger Dateiname {dateiname!r} — erwartet wird ein "
+            "Zettel-Name wie '2026-07-11_1430_werkstatt-an-architekt.md'."
         )
     folder = _briefkasten()
     path = folder / dateiname
     # Belt and suspenders: the resolved path must stay inside the mailbox.
     if path.resolve().parent != folder.resolve():
         raise BriefkastenError(
-            f"Ungültiger Dateiname: '{dateiname}' — Pfad verlässt den "
+            f"Ungültiger Dateiname {dateiname!r} — Pfad verlässt den "
             "Briefkasten-Ordner."
         )
     return path
@@ -165,16 +162,21 @@ def zettel_liste(an: str | None = None) -> str:
     folder = _briefkasten()
     jetzt = datetime.now()
 
-    zettel = []
-    for path in folder.iterdir():
-        if not path.is_file():
-            continue
-        parts = _parse_filename(path.name)
-        if parts is None:
-            continue
-        if an is not None and parts["an"] != an:
-            continue
-        zettel.append((parts["zeitpunkt"], path.name, parts["von"], parts["an"]))
+    try:
+        zettel = []
+        for path in folder.iterdir():
+            if not path.is_file():
+                continue
+            parts = _parse_filename(path.name)
+            if parts is None:
+                continue
+            if an is not None and parts["an"] != an:
+                continue
+            zettel.append((parts["zeitpunkt"], path.name, parts["von"], parts["an"]))
+    except OSError as exc:
+        raise BriefkastenError(
+            f"Briefkasten-Ordner '{folder}' ist nicht lesbar: {exc}"
+        )
 
     if not zettel:
         wen = f" für '{an}'" if an is not None else ""
@@ -237,7 +239,15 @@ def zettel_schreiben(von: str, an: str, inhalt: str) -> str:
                 f.write(text)
             break
         except FileExistsError:
+            # Same-minute collision — try the next suffix. Caught before the
+            # OSError below on purpose: FileExistsError is a subclass of
+            # OSError, so the generic handler would otherwise swallow the
+            # retry path.
             n += 1
+        except OSError as exc:
+            raise BriefkastenError(
+                f"Zettel '{name}' konnte nicht geschrieben werden: {exc}"
+            )
 
     return name
 
