@@ -202,5 +202,45 @@ def zettel_lesen(dateiname: str) -> str:
     return _read_text(path)
 
 
+@mcp.tool()
+def zettel_schreiben(von: str, an: str, inhalt: str) -> str:
+    """Write a new Zettel to the mailbox and return its filename.
+
+    'von' and 'an' are room names (lowercase letters/digits). 'inhalt' is
+    the message body only — the "Von/An/Datum" header is added
+    automatically. Never overwrites an existing Zettel: a name collision in
+    the same minute gets a _2, _3, … suffix. Empty or whitespace-only
+    inhalt is rejected.
+    """
+    von = _validate_name(von, "von")
+    an = _validate_name(an, "an")
+    if not inhalt or not inhalt.strip():
+        raise BriefkastenError(
+            "Der Zettel-Inhalt ist leer — bitte einen Text angeben."
+        )
+
+    folder = _briefkasten()
+    jetzt = datetime.now()
+    base = f"{jetzt.strftime('%Y-%m-%d_%H%M')}_{von}-an-{an}"
+    kopf = f"Von: {von}\nAn: {an}\nDatum: {jetzt.strftime('%Y-%m-%d %H:%M')}\n\n"
+    text = kopf + inhalt
+
+    n = 1
+    while True:
+        name = f"{base}.md" if n == 1 else f"{base}_{n}.md"
+        path = folder / name
+        try:
+            # "x": create-only — raises if the file already exists, so an
+            # existing Zettel is never overwritten. newline="" keeps the
+            # body's line endings exactly as written.
+            with path.open("x", encoding="utf-8", newline="") as f:
+                f.write(text)
+            break
+        except FileExistsError:
+            n += 1
+
+    return name
+
+
 if __name__ == "__main__":
     mcp.run()

@@ -10,8 +10,9 @@ repo and vault. Local only — no remote, no push.
 - `zettel_liste(an=None)` — list unread Zettel (filename, sender, recipient,
   age). Optional recipient filter.
 - `zettel_lesen(dateiname)` — return the content of one Zettel.
-- `zettel_schreiben(von, an, inhalt)` — create a new Zettel. Never overwrites,
-  never deletes.
+- `zettel_schreiben(von, an, inhalt)` — create a new Zettel and return its
+  filename. `inhalt` is the message body only; the `Von/An/Datum` header is
+  added automatically. Never overwrites, never deletes.
 
 Archiving (moving to `gelesen/`) is done by hand for now.
 
