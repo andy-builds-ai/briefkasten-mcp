@@ -114,5 +114,80 @@ def _read_text(path: Path) -> str:
         raise BriefkastenError(f"Zettel '{path.name}' nicht lesbar: {exc}")
 
 
+def _parse_filename(dateiname: str) -> dict | None:
+    """Split a Zettel filename into von, an, and its timestamp.
+
+    Returns {von, an, zeitpunkt} when the name matches the Zettel scheme
+    with a real timestamp, or None for anything else — a stray file, or a
+    name that fits the pattern but whose time part is not a valid time.
+    """
+    match = FILENAME_PATTERN.match(dateiname)
+    if not match:
+        return None
+    datum, uhrzeit, von, an, _suffix = match.groups()
+    try:
+        zeitpunkt = datetime.strptime(f"{datum}_{uhrzeit}", "%Y-%m-%d_%H%M")
+    except ValueError:
+        return None
+    return {"von": von, "an": an, "zeitpunkt": zeitpunkt}
+
+
+def _alter(zeitpunkt: datetime, jetzt: datetime) -> str:
+    """Human-readable German age of a Zettel, relative to jetzt."""
+    delta = jetzt - zeitpunkt
+    sekunden = delta.total_seconds()
+    if sekunden < 0:
+        return "in der Zukunft"
+    if sekunden < 60:
+        return "gerade eben"
+    if sekunden < 3600:
+        n = int(sekunden // 60)
+        return f"vor {n} Minute{'n' if n != 1 else ''}"
+    if delta.days < 1:
+        n = int(sekunden // 3600)
+        return f"vor {n} Stunde{'n' if n != 1 else ''}"
+    n = delta.days
+    return f"vor {n} Tag{'en' if n != 1 else ''}"
+
+
+@mcp.tool()
+def zettel_liste(an: str | None = None) -> str:
+    """List unread Zettel in the mailbox, newest first.
+
+    Each line shows sender, recipient, timestamp, age, and the filename to
+    hand to zettel_lesen. Pass 'an' to show only Zettel addressed to that
+    room (e.g. an="architekt"); omit it to list all. Read Zettel live in the
+    gelesen/ subfolder and are never listed.
+    """
+    if an is not None:
+        an = _validate_name(an, "an")
+
+    folder = _briefkasten()
+    jetzt = datetime.now()
+
+    zettel = []
+    for path in folder.iterdir():
+        if not path.is_file():
+            continue
+        parts = _parse_filename(path.name)
+        if parts is None:
+            continue
+        if an is not None and parts["an"] != an:
+            continue
+        zettel.append((parts["zeitpunkt"], path.name, parts["von"], parts["an"]))
+
+    if not zettel:
+        wen = f" für '{an}'" if an is not None else ""
+        return f"Keine ungelesenen Zettel{wen}."
+
+    zettel.sort(reverse=True)  # newest first
+    lines = [
+        f"{von} → {empf}   {zeit.strftime('%Y-%m-%d %H:%M')} "
+        f"({_alter(zeit, jetzt)})   [{name}]"
+        for zeit, name, von, empf in zettel
+    ]
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
     mcp.run()
