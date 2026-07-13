@@ -20,6 +20,10 @@ Archiving (moving to `gelesen/`) is done by hand for now.
 
 Filename: `YYYY-MM-DD_HHMM_<von>-an-<an>.md`
 
+The body is free-form (handover, report, question — whatever the rooms need);
+only the header is fixed, and the server writes it itself. Example of a
+session handover:
+
 ```markdown
 Von: werkstatt
 An: architekt
