@@ -45,8 +45,8 @@ only the header is fixed, and the server writes it itself. Example of a
 session handover:
 
 ```markdown
-Von: werkstatt
-An: architekt
+Von: workshop
+An: architect
 Datum: 2026-07-12 14:30
 
 Working on: ...
@@ -79,6 +79,8 @@ The server is deliberately narrow about what it can touch:
   returned as a plain explanation instead of raising.
 
 ## Setup
+
+Requires Python 3.10 or newer.
 
 Windows:
 
