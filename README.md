@@ -9,6 +9,22 @@ the repo. Part of a small series of personal MCP servers — see
 
 Built with the official MCP Python SDK (`mcp`, FastMCP), served over stdio.
 
+## German terms
+
+Tool and field names are German. This glossary maps them to English:
+
+| German | English |
+|---|---|
+| Briefkasten | mailbox |
+| Zettel | note |
+| zettel_liste | list notes |
+| zettel_lesen | read note |
+| zettel_schreiben | write note |
+| von / an / inhalt | from / to / content |
+| dateiname | filename |
+| Von / An / Datum | From / To / Date (the Zettel header) |
+| gelesen/ | read (archive folder) |
+
 ## Tools
 
 - `zettel_liste(an=None)` — list unread Zettel (filename, sender, recipient,
@@ -33,9 +49,9 @@ Von: werkstatt
 An: architekt
 Datum: 2026-07-12 14:30
 
-Woran: ...
-Deine Hand offen: ...
-Als nächstes: ...
+Working on: ...
+Your call: ...
+Next: ...
 ```
 
 ## Security model
