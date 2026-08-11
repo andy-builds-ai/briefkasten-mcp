@@ -24,6 +24,7 @@ Tool and field names are German. This glossary maps them to English:
 | dateiname | filename |
 | Von / An / Datum | From / To / Date (the Zettel header) |
 | gelesen/ | read (archive folder) |
+| zettel_abraeumen | clear notes |
 
 ## Tools
 
@@ -33,8 +34,11 @@ Tool and field names are German. This glossary maps them to English:
 - `zettel_schreiben(von, an, inhalt)` — create a new Zettel and return its
   filename. `inhalt` is the message body only; the `Von/An/Datum` header is
   added automatically. Never overwrites, never deletes.
-
-Archiving (moving to `gelesen/`) is done by hand for now.
+- `zettel_abraeumen(dateinamen)` — move the named Zettel into `gelesen/`.
+  Always a list, even for one Zettel; there is no "clear all" mode, since a
+  blanket clear could disappear post nobody ever read. A bad or missing name
+  never stops the run — it's reported and the rest of the list still gets
+  processed.
 
 ## Zettel format
 
@@ -71,8 +75,9 @@ The server is deliberately narrow about what it can touch:
 - **Write is create-only.** New Zettel are opened in `"x"` mode, so an
   existing file is never overwritten; a same-minute name collision gets a
   `_2`, `_3`, … suffix. Empty content is rejected.
-- **No delete tool by design.** The server can list, read, and create.
-  Removing a Zettel is a manual act, not something the model can do.
+- **No delete tool by design.** The server can list, read, create, and move
+  into `gelesen/`. Removing a Zettel is a manual act, not something the
+  model can do.
 - **Errors surface as messages, not tracebacks.** Expected failures —
   missing config, an invalid name, a missing or unreadable Zettel, a folder
   that can't be created, a write that can't complete — are caught and
@@ -110,14 +115,19 @@ Verified along the build's review chain:
 
 1. Direct function calls covering the normal case, edge cases, and forced
    error paths (missing `BRIEFKASTEN_PATH`, invalid names, path-escape
-   attempts, name collisions, empty content).
-2. A programmatic MCP client over stdio, exercising the three tools through
-   the real protocol.
+   attempts, name collisions, empty content, an already-cleared or
+   nowhere-found Zettel, a failed move).
+2. A programmatic MCP client over stdio, exercising the tools through the
+   real protocol (`tests/test_zettel_abraeumen.py`).
 3. A cold closing review through an isolated reviewer (2× Sonnet, correctness
    and security). Four findings were fixed.
 
 ## Limits
 
 - Single mailbox on one machine, no networking.
-- No delete or archive tool — `gelesen/` is tidied by hand.
+- No delete tool and no bulk-clear — `zettel_abraeumen` only moves the
+  Zettel it's told by name, one at a time.
+- If a Zettel of the same name already sits in `gelesen/`, the original is
+  left in the mailbox and keeps showing up in `zettel_liste`. Resolving that
+  is a manual act, since the server never deletes anything.
 - No search or full-text index; `zettel_liste` lists, `zettel_lesen` reads.

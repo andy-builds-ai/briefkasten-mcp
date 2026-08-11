@@ -252,5 +252,61 @@ def zettel_schreiben(von: str, an: str, inhalt: str) -> str:
     return name
 
 
+@mcp.tool()
+def zettel_abraeumen(dateinamen: list[str]) -> str:
+    """Move the named Zettel from the mailbox into the gelesen/ subfolder.
+
+    Pass every filename to clear, even a single one — always as a list.
+    There is no "clear all" mode: the caller names each Zettel, since a
+    blanket clear could disappear post nobody ever read. A bad name never
+    stops the run; each Zettel is handled on its own and the report lists
+    everything that was not a plain move — a Zettel already sitting in
+    gelesen/, one missing everywhere, a rejected name, or a filesystem
+    error. Never deletes, never overwrites: a Zettel already present in
+    gelesen/ is left exactly where it is.
+    """
+    erledigt = 0
+    notizen: list[str] = []
+
+    for name in dateinamen:
+        try:
+            quelle = _validate_dateiname(name)
+        except BriefkastenError as exc:
+            notizen.append(f"{name}: abgelehnt — {exc}")
+            continue
+
+        ziel = quelle.parent / "gelesen" / name
+        quelle_da = quelle.is_file()
+        ziel_da = ziel.is_file()
+
+        if quelle_da and not ziel_da:
+            # Checking the target instead of trusting rename(): on Windows
+            # it raises when the target exists, on POSIX it silently
+            # overwrites — the check above already secured the "target
+            # free" case, so the OSError here only catches other reasons.
+            try:
+                quelle.rename(ziel)
+                erledigt += 1
+            except OSError as exc:
+                notizen.append(f"{name}: Verschieben fehlgeschlagen — {exc}")
+        elif quelle_da and ziel_da:
+            erledigt += 1
+            notizen.append(
+                f"{name}: schon abgeräumt — Original bleibt im Kasten liegen."
+            )
+        elif not quelle_da and ziel_da:
+            erledigt += 1
+            notizen.append(f"{name}: schon abgeräumt.")
+        else:
+            notizen.append(
+                f"{name}: nicht gefunden — weder im Kasten noch in gelesen/."
+            )
+
+    bilanz = f"{erledigt} von {len(dateinamen)} abgeräumt."
+    if notizen:
+        return bilanz + "\n" + "\n".join(notizen)
+    return bilanz
+
+
 if __name__ == "__main__":
     mcp.run()
